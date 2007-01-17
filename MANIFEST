@@ -1,0 +1,7 @@
+lib/Lingua/Verbnet.pm
+lib/Lingua/Verbnet/Ambiguity.pm
+Makefile.PL
+MANIFEST			This list of files
+README
+verbstat
+META.yml                                 Module meta-data (added by MakeMaker)

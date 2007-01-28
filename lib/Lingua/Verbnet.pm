@@ -2,69 +2,64 @@ package Lingua::Verbnet;
 
 use strict;
 use warnings;
-our $VERSION = sprintf "%d.%03d", q$Revision: 1.1 $ =~ /(\d+)/g;
+our $VERSION = sprintf "%d.%03d", q$Revision: 1.2 $ =~ /(\d+)/g;
 
 use XML::Parser;
 use Lingua::Verbnet::Ambiguity; 
-
-our %stats; # currently just the ambiguity stats
-{
-	package Lingua::Verbnet::StatHandlers; # handlers to fill up %stats
-	sub VNCLASS {
-		my $frames = 0;
-		my @members = ();
-
-		no warnings 'once';
-		no warnings 'redefine'; # we purposefully redefine the subs here,
-		# in order to package the correct $frames/@members in the closure
-
-		*{Lingua::Verbnet::StatHandlers::MEMBER} = sub {
-			my ($parser, $el, %attrs) = @_;
-			push @members, $attrs{'name'};
-		};
-
-		*{Lingua::Verbnet::StatHandlers::FRAME} = sub { $frames++; };
-
-		*{Lingua::Verbnet::StatHandlers::VNCLASS_} = sub { 
-			for my $e (@members) {
-				# let += operate on unused slots silently
-				no warnings 'uninitialized';
-				$stats{$e} += $frames;
-			}
-		};
-	}
-}
+use Carp;
 
 sub new {
+	my %stats = (); # currently just the ambiguity stats
 	my $class = shift;
 	my $parser = new XML::Parser(
 		Style => 'Subs', 
 		Pkg => 'Lingua::Verbnet::StatHandlers');
-	%stats = ();
+	{
+		package Lingua::Verbnet::StatHandlers; # handlers to fill up %stats
+		no warnings 'once';
+		no warnings 'redefine'; # we purposefully redefine the subs here,
+		# in order to package the correct %stats/$frames/@members in the closure
+		*{VNCLASS} = sub { # in Lingua::Verbnet::StatHandlers::
+			my $frames = 0;
+			my @members = ();
+
+			*{MEMBER} = sub {
+				my ($parser, $el, %attrs) = @_;
+				push @members, $attrs{'name'};
+			};
+
+			*{FRAME} = sub { $frames++; };
+
+			*{VNCLASS_} = sub { 
+				for my $e (@members) {
+					# let += operate on unused slots silently
+					no warnings 'uninitialized';
+					$stats{$e} += $frames;
+				}
+			};
+		};
+	}
 	for my $file (@_) {
 		$parser->parsefile($file);
 	}
-	my %s = %stats;
+	my %ambiguity = %stats;
 	my $closure = sub {
 		if ('ambiguity' eq $_[0]) {
-			bless \%s, 'Lingua::Verbnet::Ambiguity';
+			bless \%ambiguity, 'Lingua::Verbnet::Ambiguity';
 		}
 		else {
-			die "$class can't $_[0]";
+			croak "$class can't $_[0]";
 		}
 	};
 	bless $closure, $class;
 }
 
-our $AUTOLOAD;
-sub AUTOLOAD { # adopted from the perlbot(1) example
+sub DESTROY {}
+sub AUTOLOAD {
 	   my $self = shift;
 
-	   # DESTROY messages should never be propagated.
-	   return if $AUTOLOAD =~ /::DESTROY$/;
-
-	   # Remove the package name.
-	   $AUTOLOAD =~ s/^.*:://;
+	   # Remove the package name. See perlbot(1).
+	   our $AUTOLOAD =~ s/^.*:://;
 
 	   $self->($AUTOLOAD,@_);
 }
@@ -118,8 +113,8 @@ where this code originated.
 
 =head1 SEE ALSO
 
-L<verbstat(1)>, L<difficult(1)>, 
-I<Web VerbNet> at L<http://www.cis.upenn.edu/~bsnyder3/cgi-bin/search.cgi>
+L<verbstat(1)>, L<difficult(1)>, L<Lingua::Verbnet::Ambiguity>,
+I<VerbNet> at L<http://verbs.colorado.edu/verb-index/index.php>
 
 =head1 AUTHOR
 
